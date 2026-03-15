@@ -16,8 +16,9 @@ var rootCmd = &cobra.Command{
 Runs again on existing folders to pull updates — no re-cloning.`,
 	Example: `  orgclone clone my-org
   orgclone clone my-group --gitlab
-  orgclone clone my-org --dry-run
-  orgclone default gitlab`,
+  orgclone clone my-org --pick
+  orgclone default platform gitlab
+  orgclone default dest ~/projects`,
 	Version: version,
 }
 

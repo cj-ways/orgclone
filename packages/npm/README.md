@@ -17,14 +17,18 @@ npm install -g @cj-ways/orgclone
 # Clone a GitHub org (GitHub is the default)
 orgclone clone my-org
 
+# Interactively pick which repos to clone
+orgclone clone my-org --pick
+
 # Clone a GitLab group
 orgclone clone my-group --gitlab
 
 # Preview what would be cloned
 orgclone clone my-org --dry-run
 
-# Switch default platform to GitLab permanently
-orgclone default gitlab
+# Change defaults permanently
+orgclone default platform gitlab
+orgclone default dest ~/projects
 ```
 
 Repos land in `~/Desktop/my-org/` by default. Run it again on the same folder and it `git pull`s everything — no re-cloning.
@@ -47,22 +51,25 @@ Repos land in `~/Desktop/my-org/` by default. Run it again on the same folder an
 ```
 orgclone clone <name> [options]
 
-  name              org name (GitHub) or group path (GitLab)
+  name                  org name (GitHub) or group path (GitLab)
 
-Options:
-      --gitlab      Use GitLab instead of the default platform (GitHub)
-  -t, --token       API token — or set GITHUB_TOKEN / GITLAB_TOKEN env var
-  -d, --dest        Destination folder  (default: ~/Desktop/<name>)
-  -e, --exclude     Comma-separated repo names to skip
+  --gitlab              Use GitLab instead of the default platform
+  --pick                Interactively select which repos to clone
+  -t, --token           API token (or set GITHUB_TOKEN / GITLAB_TOKEN)
+  -d, --dest            Destination folder (default: ~/Desktop/<name>)
+  -e, --exclude         Comma-separated repo names to skip
       --skip-archived   Skip archived repositories
-      --ssh         Use SSH URLs instead of HTTPS
-      --gitlab-url  Self-hosted GitLab URL  (default: https://gitlab.com)
-      --dry-run     List repos without cloning
+      --gitlab-url      Self-hosted GitLab URL (default: https://gitlab.com)
+      --dry-run         List repos without cloning
 
-orgclone default <platform>
+orgclone default <setting> <value>
 
-  Change the default platform permanently (saved to ~/.orgclone.yml)
-  Example: orgclone default gitlab
+  platform    github or gitlab
+  dest        path to clone into (e.g. ~/projects)
+
+  Examples:
+    orgclone default platform gitlab
+    orgclone default dest ~/projects
 ```
 
 ---
@@ -97,6 +104,7 @@ Run `orgclone init` to generate `~/.orgclone.yml`:
 
 ```yaml
 default_dest: ~/Desktop
+default_platform: github   # or gitlab
 
 github:
   token: ghp_xxx        # or: export GITHUB_TOKEN=ghp_xxx

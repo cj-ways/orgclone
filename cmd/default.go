@@ -11,12 +11,15 @@ import (
 )
 
 var defaultCmd = &cobra.Command{
-	Use:     "default <platform>",
-	Short:   "Set the default platform (github or gitlab)",
+	Use:     "default <setting> <value>",
+	Short:   "Set a default value permanently",
 	GroupID: "config",
-	Example: `  orgclone default gitlab   # use GitLab by default
-  orgclone default github   # switch back to GitHub`,
-	Args: cobra.ExactArgs(1),
+	Long: `Set a default value that persists across all future runs.
+Settings are saved to ~/.orgclone.yml.`,
+	Example: `  orgclone default platform gitlab    # use GitLab by default
+  orgclone default platform github    # switch back to GitHub
+  orgclone default dest ~/projects    # change default clone destination`,
+	Args: cobra.ExactArgs(2),
 	RunE: runDefault,
 }
 
@@ -25,20 +28,38 @@ func init() {
 }
 
 func runDefault(cmd *cobra.Command, args []string) error {
-	platform := strings.ToLower(args[0])
-	if platform != "github" && platform != "gitlab" {
-		return fmt.Errorf("platform must be 'github' or 'gitlab'")
-	}
+	setting := strings.ToLower(args[0])
+	value := args[1]
 
+	switch setting {
+	case "platform":
+		value = strings.ToLower(value)
+		if value != "github" && value != "gitlab" {
+			return fmt.Errorf("platform must be 'github' or 'gitlab'")
+		}
+		return saveConfig("default_platform", value, fmt.Sprintf("Default platform set to: %s", value))
+
+	case "dest":
+		// Expand ~ so we store a clean path
+		if strings.HasPrefix(value, "~/") {
+			value = "~/" + value[2:] // keep tilde for portability
+		}
+		return saveConfig("default_dest", value, fmt.Sprintf("Default destination set to: %s", value))
+
+	default:
+		return fmt.Errorf("unknown setting %q — available: platform, dest", setting)
+	}
+}
+
+func saveConfig(key, value, successMsg string) error {
 	cfgPath := filepath.Join(homeDir(), ".orgclone.yml")
 
-	// Load existing config as raw map to preserve unknown fields
 	raw := make(map[string]any)
 	if data, err := os.ReadFile(cfgPath); err == nil {
 		_ = yaml.Unmarshal(data, &raw)
 	}
 
-	raw["default_platform"] = platform
+	raw[key] = value
 
 	data, err := yaml.Marshal(raw)
 	if err != nil {
@@ -48,7 +69,7 @@ func runDefault(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Printf("Default platform set to: %s\n", platform)
+	fmt.Println(successMsg)
 	return nil
 }
 
