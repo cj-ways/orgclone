@@ -11,9 +11,10 @@ import (
 )
 
 var defaultCmd = &cobra.Command{
-	Use:   "default <platform>",
-	Short: "Set the default platform (github or gitlab)",
-	Example: `  orgclone default gitlab   # future clones use GitLab by default
+	Use:     "default <platform>",
+	Short:   "Set the default platform (github or gitlab)",
+	GroupID: "config",
+	Example: `  orgclone default gitlab   # use GitLab by default
   orgclone default github   # switch back to GitHub`,
 	Args: cobra.ExactArgs(1),
 	RunE: runDefault,

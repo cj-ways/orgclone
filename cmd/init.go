@@ -9,8 +9,10 @@ import (
 )
 
 var initCmd = &cobra.Command{
-	Use:   "init",
-	Short: "Create a sample ~/.orgclone.yml config file",
+	Use:     "init",
+	Short:   "Create a sample ~/.orgclone.yml config file",
+	GroupID: "config",
+	Example: `  orgclone init`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		home, _ := os.UserHomeDir()
 		cfgPath := filepath.Join(home, ".orgclone.yml")

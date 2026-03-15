@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -21,16 +22,25 @@ var (
 	flagSSH       bool
 	flagGitLabURL string
 	flagDryRun    bool
+	flagJSON      bool // --json outputs dry-run as JSON for scripting
 	flagGitLab    bool // --gitlab flag to override default platform
 )
 
 var cloneCmd = &cobra.Command{
-	Use:   "clone <name>",
-	Short: "Clone all repos from an org or group (default: GitHub)",
+	Use:     "clone <name>",
+	Short:   "Clone all repos from an org or group",
+	GroupID: "core",
 	Long: `Clone all repos from a GitHub org or GitLab group.
 
 Defaults to GitHub. Use --gitlab to target GitLab instead,
-or change the default permanently with: orgclone default gitlab`,
+or change the default permanently with: orgclone default gitlab.
+
+Running it again on an already-cloned folder pulls updates on all repos.`,
+	Example: `  orgclone clone my-org
+  orgclone clone my-group --gitlab
+  orgclone clone my-org --dest ~/projects/my-org
+  orgclone clone my-org --exclude old-repo,scratch --skip-archived
+  orgclone clone my-org --dry-run`,
 	Args: cobra.ExactArgs(1),
 	RunE: runClone,
 }
@@ -44,7 +54,23 @@ func init() {
 	cloneCmd.Flags().BoolVar(&flagSSH, "ssh", false, "Force SSH URLs (requires SSH key set up)")
 	cloneCmd.Flags().StringVar(&flagGitLabURL, "gitlab-url", "", "Self-hosted GitLab URL")
 	cloneCmd.Flags().BoolVar(&flagDryRun, "dry-run", false, "List repos without cloning")
+	cloneCmd.Flags().BoolVar(&flagJSON, "json", false, "Output as JSON (use with --dry-run)")
 	cloneCmd.Flags().BoolVar(&flagGitLab, "gitlab", false, "Use GitLab instead of GitHub")
+}
+
+func printJSON(repos []repoInfo) {
+	type jsonRepo struct {
+		Name        string `json:"name"`
+		Archived    bool   `json:"archived"`
+		Description string `json:"description"`
+	}
+	out := make([]jsonRepo, len(repos))
+	for i, r := range repos {
+		out[i] = jsonRepo{r.Name, r.Archived, r.Description}
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(out)
 }
 
 type repoInfo struct {
@@ -133,20 +159,24 @@ func runClone(cmd *cobra.Command, args []string) error {
 
 	// Dry run — just list
 	if flagDryRun {
-		fmt.Printf("%-40s  %-8s  %s\n", "REPO", "ARCHIVED", "DESCRIPTION")
-		fmt.Println(strings.Repeat("-", 80))
-		for _, r := range filtered {
-			arch := ""
-			if r.Archived {
-				arch = "yes"
+		if flagJSON {
+			printJSON(filtered)
+		} else {
+			fmt.Printf("%-40s  %-8s  %s\n", "REPO", "ARCHIVED", "DESCRIPTION")
+			fmt.Println(strings.Repeat("-", 80))
+			for _, r := range filtered {
+				arch := ""
+				if r.Archived {
+					arch = "yes"
+				}
+				desc := r.Description
+				if len(desc) > 50 {
+					desc = desc[:47] + "..."
+				}
+				fmt.Printf("%-40s  %-8s  %s\n", r.Name, arch, desc)
 			}
-			desc := r.Description
-			if len(desc) > 50 {
-				desc = desc[:47] + "..."
-			}
-			fmt.Printf("%-40s  %-8s  %s\n", r.Name, arch, desc)
+			fmt.Printf("\n%d repos\n", len(filtered))
 		}
-		fmt.Printf("\n%d repos\n", len(filtered))
 		return nil
 	}
 
