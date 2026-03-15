@@ -1,0 +1,20 @@
+{
+  "name": "orgclone",
+  "version": "0.1.0",
+  "description": "Clone entire GitHub orgs or GitLab groups with one command",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/000Janela000/orgclone"
+  },
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "bin": {
+    "orgclone": "./bin/orgclone"
+  },
+  "files": [
+    "bin/",
+    "install.js"
+  ]
+}

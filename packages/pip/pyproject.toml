@@ -9,15 +9,9 @@ description = "Clone entire GitHub orgs or GitLab groups with one command"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
-dependencies = [
-    "typer>=0.12.0",
-    "httpx>=0.27.0",
-    "pyyaml>=6.0",
-    "rich>=13.0",
-]
 
 [project.scripts]
-orgclone = "orgclone.cli:app"
+orgclone = "orgclone_bin.__main__:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["orgclone"]
+packages = ["orgclone_bin"]
