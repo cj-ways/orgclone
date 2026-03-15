@@ -1,7 +1,7 @@
 {
   "name": "@cj-ways/orgclone",
-  "version": "0.4.0",
-  "binaryVersion": "0.4.0",
+  "version": "0.5.0",
+  "binaryVersion": "0.5.0",
   "description": "Clone entire GitHub organizations or GitLab groups with one command. Supports public and private repos, SSH, token auth, and config files.",
   "license": "MIT",
   "author": "cj-ways",
