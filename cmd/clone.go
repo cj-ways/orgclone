@@ -1,12 +1,12 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	survey "github.com/AlecAivazis/survey/v2"
 	"github.com/cj-ways/orgclone/internal/config"
 	"github.com/cj-ways/orgclone/internal/git"
 	gh "github.com/cj-ways/orgclone/internal/github"
@@ -15,15 +15,14 @@ import (
 )
 
 var (
-	flagToken     string
-	flagDest      string
-	flagExclude   string
-	flagSkipArch  bool
-	flagSSH       bool
+	flagToken    string
+	flagDest     string
+	flagExclude  string
+	flagSkipArch bool
+	flagDryRun   bool
+	flagPick     bool
+	flagGitLab   bool
 	flagGitLabURL string
-	flagDryRun    bool
-	flagJSON      bool // --json outputs dry-run as JSON for scripting
-	flagGitLab    bool // --gitlab flag to override default platform
 )
 
 var cloneCmd = &cobra.Command{
@@ -38,8 +37,8 @@ or change the default permanently with: orgclone default gitlab.
 Running it again on an already-cloned folder pulls updates on all repos.`,
 	Example: `  orgclone clone my-org
   orgclone clone my-group --gitlab
-  orgclone clone my-org --dest ~/projects/my-org
-  orgclone clone my-org --exclude old-repo,scratch --skip-archived
+  orgclone clone my-org --pick
+  orgclone clone my-org --exclude old-repo,scratch
   orgclone clone my-org --dry-run`,
 	Args: cobra.ExactArgs(1),
 	RunE: runClone,
@@ -51,32 +50,15 @@ func init() {
 	cloneCmd.Flags().StringVarP(&flagDest, "dest", "d", "", "Destination folder (default: ~/Desktop/<name>)")
 	cloneCmd.Flags().StringVarP(&flagExclude, "exclude", "e", "", "Comma-separated repo names to skip")
 	cloneCmd.Flags().BoolVar(&flagSkipArch, "skip-archived", false, "Skip archived repositories")
-	cloneCmd.Flags().BoolVar(&flagSSH, "ssh", false, "Force SSH URLs (requires SSH key set up)")
-	cloneCmd.Flags().StringVar(&flagGitLabURL, "gitlab-url", "", "Self-hosted GitLab URL")
 	cloneCmd.Flags().BoolVar(&flagDryRun, "dry-run", false, "List repos without cloning")
-	cloneCmd.Flags().BoolVar(&flagJSON, "json", false, "Output as JSON (use with --dry-run)")
+	cloneCmd.Flags().BoolVar(&flagPick, "pick", false, "Interactively select which repos to clone")
 	cloneCmd.Flags().BoolVar(&flagGitLab, "gitlab", false, "Use GitLab instead of GitHub")
-}
-
-func printJSON(repos []repoInfo) {
-	type jsonRepo struct {
-		Name        string `json:"name"`
-		Archived    bool   `json:"archived"`
-		Description string `json:"description"`
-	}
-	out := make([]jsonRepo, len(repos))
-	for i, r := range repos {
-		out[i] = jsonRepo{r.Name, r.Archived, r.Description}
-	}
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	_ = enc.Encode(out)
+	cloneCmd.Flags().StringVar(&flagGitLabURL, "gitlab-url", "", "Self-hosted GitLab URL")
 }
 
 type repoInfo struct {
 	Name        string
 	CloneURL    string
-	SSHURL      string
 	Archived    bool
 	Description string
 }
@@ -127,7 +109,7 @@ func runClone(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to fetch repos: %w", err)
 		}
 		for _, r := range raw {
-			repos = append(repos, repoInfo{r.Name, r.CloneURL, r.SSHURL, r.Archived, r.Description})
+			repos = append(repos, repoInfo{r.Name, r.CloneURL, r.Archived, r.Description})
 		}
 	} else {
 		glURL := flagGitLabURL
@@ -139,11 +121,11 @@ func runClone(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to fetch repos: %w", err)
 		}
 		for _, r := range raw {
-			repos = append(repos, repoInfo{r.Name, r.CloneHTTP, r.CloneSSH, r.Archived, r.Description})
+			repos = append(repos, repoInfo{r.Name, r.CloneHTTP, r.Archived, r.Description})
 		}
 	}
 
-	// Filter repos
+	// Apply exclusions and --skip-archived
 	var filtered []repoInfo
 	for _, r := range repos {
 		if exclude[r.Name] || (flagSkipArch && r.Archived) {
@@ -157,26 +139,35 @@ func runClone(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Dry run — just list
-	if flagDryRun {
-		if flagJSON {
-			printJSON(filtered)
-		} else {
-			fmt.Printf("%-40s  %-8s  %s\n", "REPO", "ARCHIVED", "DESCRIPTION")
-			fmt.Println(strings.Repeat("-", 80))
-			for _, r := range filtered {
-				arch := ""
-				if r.Archived {
-					arch = "yes"
-				}
-				desc := r.Description
-				if len(desc) > 50 {
-					desc = desc[:47] + "..."
-				}
-				fmt.Printf("%-40s  %-8s  %s\n", r.Name, arch, desc)
-			}
-			fmt.Printf("\n%d repos\n", len(filtered))
+	// --pick: interactive checkbox selection
+	if flagPick {
+		selected, err := pickRepos(filtered)
+		if err != nil {
+			return err
 		}
+		if len(selected) == 0 {
+			fmt.Println("Nothing selected.")
+			return nil
+		}
+		filtered = selected
+	}
+
+	// --dry-run: just list, don't clone
+	if flagDryRun {
+		fmt.Printf("%-40s  %-8s  %s\n", "REPO", "ARCHIVED", "DESCRIPTION")
+		fmt.Println(strings.Repeat("-", 80))
+		for _, r := range filtered {
+			arch := ""
+			if r.Archived {
+				arch = "yes"
+			}
+			desc := r.Description
+			if len(desc) > 50 {
+				desc = desc[:47] + "..."
+			}
+			fmt.Printf("%-40s  %-8s  %s\n", r.Name, arch, desc)
+		}
+		fmt.Printf("\n%d repos\n", len(filtered))
 		return nil
 	}
 
@@ -186,16 +177,16 @@ func runClone(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Printf("Destination: %s\n\n", dest)
 
+	cloneURL := func(r repoInfo) string {
+		if token != "" && strings.HasPrefix(r.CloneURL, "https://") {
+			return strings.Replace(r.CloneURL, "https://", "https://oauth2:"+token+"@", 1)
+		}
+		return r.CloneURL
+	}
+
 	counts := map[git.Status]int{}
 	for _, r := range filtered {
-		cloneURL := r.CloneURL
-		if flagSSH {
-			cloneURL = r.SSHURL
-		} else if token != "" && strings.HasPrefix(cloneURL, "https://") {
-			cloneURL = strings.Replace(cloneURL, "https://", "https://oauth2:"+token+"@", 1)
-		}
-
-		result := git.CloneOrPull(r.Name, cloneURL, dest)
+		result := git.CloneOrPull(r.Name, cloneURL(r), dest)
 		counts[result.Status]++
 
 		switch result.Status {
@@ -214,4 +205,51 @@ func runClone(cmd *cobra.Command, args []string) error {
 		counts[git.Cloned], counts[git.Pulled], counts[git.UpToDate], counts[git.Failed])
 
 	return nil
+}
+
+// pickRepos shows an interactive checkbox list and returns selected repos.
+func pickRepos(repos []repoInfo) ([]repoInfo, error) {
+	// Build label list — show archived status in the label
+	labels := make([]string, len(repos))
+	for i, r := range repos {
+		label := r.Name
+		if r.Archived {
+			label += " (archived)"
+		}
+		if r.Description != "" {
+			desc := r.Description
+			if len(desc) > 50 {
+				desc = desc[:47] + "..."
+			}
+			label += " — " + desc
+		}
+		labels[i] = label
+	}
+
+	// Default: all selected
+	var chosen []string
+	prompt := &survey.MultiSelect{
+		Message:  "Select repos to clone:",
+		Options:  labels,
+		Default:  labels,
+		PageSize: 20,
+	}
+
+	if err := survey.AskOne(prompt, &chosen); err != nil {
+		return nil, err
+	}
+
+	// Map chosen labels back to repos
+	chosenSet := make(map[string]bool, len(chosen))
+	for _, c := range chosen {
+		chosenSet[c] = true
+	}
+
+	var selected []repoInfo
+	for i, label := range labels {
+		if chosenSet[label] {
+			selected = append(selected, repos[i])
+		}
+	}
+	return selected, nil
 }

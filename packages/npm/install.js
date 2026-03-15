@@ -5,6 +5,7 @@
  */
 
 const https = require("https");
+const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
@@ -31,8 +32,9 @@ function getPlatformTarget() {
 function download(url, dest) {
   return new Promise((resolve, reject) => {
     const follow = (u) => {
-      https.get(u, { headers: { "User-Agent": "orgclone-installer" } }, (res) => {
-        if (res.statusCode === 301 || res.statusCode === 302) return follow(res.headers.location);
+      const client = u.startsWith("https") ? https : http;
+      client.get(u, { headers: { "User-Agent": "orgclone-installer" } }, (res) => {
+        if ([301, 302, 303].includes(res.statusCode)) return follow(res.headers.location);
         if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`));
         const file = fs.createWriteStream(dest);
         res.pipe(file);
