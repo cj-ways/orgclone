@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "orgclone"
+version = "0.1.0"
+description = "Clone entire GitHub orgs or GitLab groups with one command"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+
+[project.scripts]
+orgclone = "orgclone_bin.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["orgclone_bin"]
