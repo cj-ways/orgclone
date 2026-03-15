@@ -1,47 +1,39 @@
 #!/usr/bin/env node
 /**
- * Postinstall script: downloads the correct orgclone binary from GitHub Releases.
+ * Postinstall script: downloads the orgclone binary from GitHub Releases.
+ * Caches by version in ~/.orgclone/ so reinstalls are instant.
  */
 
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
-const { execSync } = require("child_process");
-const zlib = require("zlib");
+const os = require("os");
 
 const REPO = "cj-ways/orgclone";
 const VERSION = require("./package.json").binaryVersion;
-const BIN_DIR = path.join(__dirname, "bin");
-const BIN_PATH = path.join(BIN_DIR, process.platform === "win32" ? "orgclone.exe" : "orgclone");
+const IS_WIN = process.platform === "win32";
+const BIN_NAME = IS_WIN ? "orgclone.exe" : "orgclone";
+
+// Package bin dir (where npm looks for the executable)
+const PKG_BIN = path.join(__dirname, "bin", BIN_NAME);
+
+// Persistent cache dir — survives npm reinstalls
+const CACHE_DIR = path.join(os.homedir(), ".orgclone", "bin");
+const CACHED_BIN = path.join(CACHE_DIR, `orgclone-${VERSION}${IS_WIN ? ".exe" : ""}`);
 
 function getPlatformTarget() {
-  const platform = process.platform;
-  const arch = process.arch;
-
-  const platformMap = { win32: "windows", darwin: "darwin", linux: "linux" };
-  const archMap = { x64: "amd64", arm64: "arm64" };
-
-  const p = platformMap[platform];
-  const a = archMap[arch];
-
-  if (!p || !a) throw new Error(`Unsupported platform: ${platform}/${arch}`);
-
-  const ext = platform === "win32" ? ".exe" : "";
-  return `orgclone_${p}_${a}${ext}`;
+  const p = { win32: "windows", darwin: "darwin", linux: "linux" }[process.platform];
+  const a = { x64: "amd64", arm64: "arm64" }[process.arch];
+  if (!p || !a) throw new Error(`Unsupported platform: ${process.platform}/${process.arch}`);
+  return `orgclone_${p}_${a}${IS_WIN ? ".exe" : ""}`;
 }
 
 function download(url, dest) {
   return new Promise((resolve, reject) => {
     const follow = (u) => {
       https.get(u, { headers: { "User-Agent": "orgclone-installer" } }, (res) => {
-        if (res.statusCode === 301 || res.statusCode === 302) {
-          follow(res.headers.location);
-          return;
-        }
-        if (res.statusCode !== 200) {
-          reject(new Error(`HTTP ${res.statusCode} for ${u}`));
-          return;
-        }
+        if (res.statusCode === 301 || res.statusCode === 302) return follow(res.headers.location);
+        if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`));
         const file = fs.createWriteStream(dest);
         res.pipe(file);
         file.on("finish", () => file.close(resolve));
@@ -53,27 +45,30 @@ function download(url, dest) {
 }
 
 async function main() {
-  if (fs.existsSync(BIN_PATH)) {
-    console.log("orgclone binary already installed.");
+  fs.mkdirSync(CACHE_DIR, { recursive: true });
+  fs.mkdirSync(path.join(__dirname, "bin"), { recursive: true });
+
+  // If this version is already cached, just copy it — no download needed
+  if (fs.existsSync(CACHED_BIN)) {
+    fs.copyFileSync(CACHED_BIN, PKG_BIN);
+    if (!IS_WIN) fs.chmodSync(PKG_BIN, 0o755);
+    console.log(`orgclone ${VERSION} ready.`);
     return;
   }
 
-  fs.mkdirSync(BIN_DIR, { recursive: true });
-
-  const target = getPlatformTarget();
-  const url = `https://github.com/${REPO}/releases/download/v${VERSION}/${target}`;
-
-  console.log(`Downloading orgclone ${VERSION} for ${process.platform}/${process.arch}...`);
+  // Download and cache
+  const url = `https://github.com/${REPO}/releases/download/v${VERSION}/${getPlatformTarget()}`;
+  console.log(`Downloading orgclone ${VERSION}...`);
 
   try {
-    await download(url, BIN_PATH);
-    if (process.platform !== "win32") {
-      fs.chmodSync(BIN_PATH, 0o755);
-    }
+    await download(url, CACHED_BIN);
+    if (!IS_WIN) fs.chmodSync(CACHED_BIN, 0o755);
+    fs.copyFileSync(CACHED_BIN, PKG_BIN);
+    if (!IS_WIN) fs.chmodSync(PKG_BIN, 0o755);
     console.log("orgclone installed successfully.");
   } catch (err) {
     console.error(`Failed to download binary: ${err.message}`);
-    console.error(`You can manually download from: https://github.com/${REPO}/releases`);
+    console.error(`Download manually from: https://github.com/${REPO}/releases`);
     process.exit(1);
   }
 }
