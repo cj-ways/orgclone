@@ -10,7 +10,7 @@ import urllib.request
 from pathlib import Path
 
 VERSION = "0.1.0"
-REPO = "000Janela000/orgclone"
+REPO = "cj-ways/orgclone"
 BIN_DIR = Path(__file__).parent / "bin"
 
 

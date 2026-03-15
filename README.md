@@ -19,10 +19,10 @@ pipx install orgclone
 
 **Go users**
 ```bash
-go install github.com/000Janela000/orgclone@latest
+go install github.com/cj-ways/orgclone@latest
 ```
 
-**Direct binary download** — grab the right binary from [Releases](https://github.com/000Janela000/orgclone/releases) and put it on your PATH.
+**Direct binary download** — grab the right binary from [Releases](https://github.com/cj-ways/orgclone/releases) and put it on your PATH.
 
 ---
 

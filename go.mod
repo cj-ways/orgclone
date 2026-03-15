@@ -1,4 +1,4 @@
-module github.com/000Janela000/orgclone
+module github.com/cj-ways/orgclone
 
 go 1.26.1
 

@@ -1,6 +1,6 @@
 package main
 
-import "github.com/000Janela000/orgclone/cmd"
+import "github.com/cj-ways/orgclone/cmd"
 
 func main() {
 	cmd.Execute()

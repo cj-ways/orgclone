@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/000Janela000/orgclone/internal/config"
-	"github.com/000Janela000/orgclone/internal/git"
-	gh "github.com/000Janela000/orgclone/internal/github"
-	gl "github.com/000Janela000/orgclone/internal/gitlab"
+	"github.com/cj-ways/orgclone/internal/config"
+	"github.com/cj-ways/orgclone/internal/git"
+	gh "github.com/cj-ways/orgclone/internal/github"
+	gl "github.com/cj-ways/orgclone/internal/gitlab"
 	"github.com/spf13/cobra"
 )
 

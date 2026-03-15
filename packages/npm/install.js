@@ -9,7 +9,7 @@ const path = require("path");
 const { execSync } = require("child_process");
 const zlib = require("zlib");
 
-const REPO = "000Janela000/orgclone";
+const REPO = "cj-ways/orgclone";
 const VERSION = require("./package.json").version;
 const BIN_DIR = path.join(__dirname, "bin");
 const BIN_PATH = path.join(BIN_DIR, process.platform === "win32" ? "orgclone.exe" : "orgclone");

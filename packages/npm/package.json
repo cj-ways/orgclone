@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/000Janela000/orgclone"
+    "url": "https://github.com/cj-ways/orgclone"
   },
   "scripts": {
     "postinstall": "node install.js"
