@@ -1,0 +1,49 @@
+{
+  "name": "@cj-ways/orgclone",
+  "version": "0.1.4",
+  "binaryVersion": "0.1.0",
+  "description": "Clone entire GitHub organizations or GitLab groups with one command. Supports public and private repos, SSH, token auth, and config files.",
+  "license": "MIT",
+  "author": "cj-ways",
+  "homepage": "https://github.com/cj-ways/orgclone#readme",
+  "bugs": {
+    "url": "https://github.com/cj-ways/orgclone/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cj-ways/orgclone.git"
+  },
+  "keywords": [
+    "github",
+    "gitlab",
+    "clone",
+    "organization",
+    "org",
+    "group",
+    "git",
+    "repos",
+    "repositories",
+    "bulk-clone",
+    "cli",
+    "devtools",
+    "github-org",
+    "gitlab-group",
+    "clone-repos",
+    "git-clone",
+    "developer-tools",
+    "automation",
+    "github-organization",
+    "sync"
+  ],
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "bin": {
+    "orgclone": "bin/orgclone"
+  },
+  "files": [
+    "bin/",
+    "install.js",
+    "README.md"
+  ]
+}
