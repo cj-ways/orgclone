@@ -10,10 +10,11 @@ import (
 )
 
 type Config struct {
-	DefaultDest string               `yaml:"default_dest"`
-	GitHub      platformConfig       `yaml:"github"`
-	GitLab      gitlabConfig         `yaml:"gitlab"`
-	Orgs        map[string]orgConfig `yaml:"orgs"`
+	DefaultDest     string               `yaml:"default_dest"`
+	DefaultPlatform string               `yaml:"default_platform"`
+	GitHub          platformConfig       `yaml:"github"`
+	GitLab          gitlabConfig         `yaml:"gitlab"`
+	Orgs            map[string]orgConfig `yaml:"orgs"`
 }
 
 type platformConfig struct {
@@ -69,6 +70,14 @@ func GetDefaultDest() string {
 	return filepath.Join(homeDir(), "Desktop")
 }
 
+// GetDefaultPlatform returns the default platform (github unless changed via `orgclone default`).
+func GetDefaultPlatform() string {
+	if p := load().DefaultPlatform; p != "" {
+		return p
+	}
+	return "github"
+}
+
 // GetExclusions returns repo names to skip for a given org/group.
 func GetExclusions(name string) []string {
 	return load().Orgs[name].Exclude
@@ -79,7 +88,7 @@ func homeDir() string {
 	return h
 }
 
-func expandHome(path string) string {
+func expandHome(path string) string { //nolint
 	if len(path) >= 2 && path[:2] == "~/" {
 		return filepath.Join(homeDir(), path[2:])
 	}

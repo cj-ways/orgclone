@@ -14,14 +14,17 @@ npm install -g @cj-ways/orgclone
 ## Quick Start
 
 ```bash
-# Clone a GitHub org (uses your existing git auth automatically)
-orgclone clone github my-org
+# Clone a GitHub org (GitHub is the default)
+orgclone clone my-org
 
 # Clone a GitLab group
-orgclone clone gitlab my-group
+orgclone clone my-group --gitlab
 
 # Preview what would be cloned
-orgclone clone github my-org --dry-run
+orgclone clone my-org --dry-run
+
+# Switch default platform to GitLab permanently
+orgclone default gitlab
 ```
 
 Repos land in `~/Desktop/my-org/` by default. Run it again on the same folder and it `git pull`s everything — no re-cloning.
@@ -42,12 +45,12 @@ Repos land in `~/Desktop/my-org/` by default. Run it again on the same folder an
 ## All Options
 
 ```
-orgclone clone <platform> <name> [options]
+orgclone clone <name> [options]
 
-  platform          github or gitlab
   name              org name (GitHub) or group path (GitLab)
 
 Options:
+      --gitlab      Use GitLab instead of the default platform (GitHub)
   -t, --token       API token — or set GITHUB_TOKEN / GITLAB_TOKEN env var
   -d, --dest        Destination folder  (default: ~/Desktop/<name>)
   -e, --exclude     Comma-separated repo names to skip
@@ -55,6 +58,11 @@ Options:
       --ssh         Use SSH URLs instead of HTTPS
       --gitlab-url  Self-hosted GitLab URL  (default: https://gitlab.com)
       --dry-run     List repos without cloning
+
+orgclone default <platform>
+
+  Change the default platform permanently (saved to ~/.orgclone.yml)
+  Example: orgclone default gitlab
 ```
 
 ---
