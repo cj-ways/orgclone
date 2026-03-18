@@ -6,7 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 )
+
+var httpClient = &http.Client{
+	Timeout: 30 * time.Second,
+}
 
 type Repo struct {
 	Name        string `json:"name"`
@@ -35,27 +40,39 @@ func ListRepos(org, token string) ([]Repo, error) {
 }
 
 func fetchPage(org, token string, page int) ([]Repo, error) {
-	// Try as org first, fall back to user if 404
-	for _, endpoint := range []string{
-		fmt.Sprintf("https://api.github.com/orgs/%s/repos", url.PathEscape(org)),
-		fmt.Sprintf("https://api.github.com/users/%s/repos", url.PathEscape(org)),
-	} {
-		repos, err := get(endpoint, token, page)
-		if err == nil {
-			return repos, nil
-		}
+	// Try as org first
+	orgEndpoint := fmt.Sprintf("https://api.github.com/orgs/%s/repos", url.PathEscape(org))
+	repos, err := get(orgEndpoint, token, page)
+	if err == nil {
+		return repos, nil
 	}
-	return nil, fmt.Errorf("could not find org or user %q on GitHub", org)
+
+	// Only fall back to user endpoint if the org endpoint returned 404
+	if !isNotFound(err) {
+		return nil, err // rate limit, auth error, etc. — don't mask it
+	}
+
+	userEndpoint := fmt.Sprintf("https://api.github.com/users/%s/repos", url.PathEscape(org))
+	repos, err = get(userEndpoint, token, page)
+	if err != nil {
+		return nil, fmt.Errorf("could not find org or user %q on GitHub: %w", org, err)
+	}
+	return repos, nil
+}
+
+func isNotFound(err error) bool {
+	return err != nil && err.Error() == "not found"
 }
 
 func get(endpoint, token string, page int) ([]Repo, error) {
 	req, _ := http.NewRequest("GET", fmt.Sprintf("%s?per_page=100&page=%d", endpoint, page), nil)
 	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -63,6 +80,12 @@ func get(endpoint, token string, page int) ([]Repo, error) {
 
 	if resp.StatusCode == 404 {
 		return nil, fmt.Errorf("not found")
+	}
+	if resp.StatusCode == 401 {
+		return nil, fmt.Errorf("authentication failed — check your token")
+	}
+	if resp.StatusCode == 403 && resp.Header.Get("X-Ratelimit-Remaining") == "0" {
+		return nil, fmt.Errorf("GitHub API rate limit exceeded. Resets at: %s", resp.Header.Get("X-Ratelimit-Reset"))
 	}
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("GitHub API: HTTP %d", resp.StatusCode)

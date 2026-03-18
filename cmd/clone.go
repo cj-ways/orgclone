@@ -82,19 +82,22 @@ func runClone(cmd *cobra.Command, args []string) error {
 	dest := flagDest
 	if dest == "" {
 		dest = filepath.Join(config.GetDefaultDest(), name)
+	} else if dest == "~" {
+		home, _ := os.UserHomeDir()
+		dest = home
 	} else if strings.HasPrefix(dest, "~/") {
 		home, _ := os.UserHomeDir()
 		dest = filepath.Join(home, dest[2:])
 	}
 
-	// Resolve exclusions (config file + --exclude flag)
+	// Resolve exclusions (config file + --exclude flag) — case-insensitive
 	exclude := make(map[string]bool)
 	for _, e := range config.GetExclusions(name) {
-		exclude[e] = true
+		exclude[strings.ToLower(e)] = true
 	}
 	if flagExclude != "" {
 		for _, e := range strings.Split(flagExclude, ",") {
-			exclude[strings.TrimSpace(e)] = true
+			exclude[strings.ToLower(strings.TrimSpace(e))] = true
 		}
 	}
 
@@ -125,10 +128,10 @@ func runClone(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Apply exclusions and --skip-archived
+	// Apply exclusions and --skip-archived (case-insensitive exclude)
 	var filtered []repoInfo
 	for _, r := range repos {
-		if exclude[r.Name] || (flagSkipArch && r.Archived) {
+		if exclude[strings.ToLower(r.Name)] || (flagSkipArch && r.Archived) {
 			continue
 		}
 		filtered = append(filtered, r)
@@ -154,20 +157,28 @@ func runClone(cmd *cobra.Command, args []string) error {
 
 	// --dry-run: just list, don't clone
 	if flagDryRun {
-		fmt.Printf("%-40s  %-8s  %s\n", "REPO", "ARCHIVED", "DESCRIPTION")
-		fmt.Println(strings.Repeat("-", 80))
+		fmt.Printf("%-40s  %-8s  %-8s  %s\n", "REPO", "STATUS", "ARCHIVED", "DESCRIPTION")
+		fmt.Println(strings.Repeat("-", 90))
+		newCount, existCount := 0, 0
 		for _, r := range filtered {
 			arch := ""
 			if r.Archived {
 				arch = "yes"
 			}
+			status := "new"
+			if git.Exists(r.Name, dest) {
+				status = "exists"
+				existCount++
+			} else {
+				newCount++
+			}
 			desc := r.Description
 			if len(desc) > 50 {
 				desc = desc[:47] + "..."
 			}
-			fmt.Printf("%-40s  %-8s  %s\n", r.Name, arch, desc)
+			fmt.Printf("%-40s  %-8s  %-8s  %s\n", r.Name, status, arch, desc)
 		}
-		fmt.Printf("\n%d repos\n", len(filtered))
+		fmt.Printf("\n%d repos (%d new, %d already cloned)\n", len(filtered), newCount, existCount)
 		return nil
 	}
 
@@ -196,13 +207,15 @@ func runClone(cmd *cobra.Command, args []string) error {
 			fmt.Printf("  ^ %-35s updated\n", r.Name)
 		case git.UpToDate:
 			fmt.Printf("  - %-35s up to date\n", r.Name)
+		case git.Skipped:
+			fmt.Printf("  ~ %-35s skipped: %s\n", r.Name, result.Message)
 		case git.Failed:
 			fmt.Printf("  x %-35s FAILED: %s\n", r.Name, result.Message)
 		}
 	}
 
-	fmt.Printf("\nDone.  %d cloned  %d updated  %d up-to-date  %d failed\n",
-		counts[git.Cloned], counts[git.Pulled], counts[git.UpToDate], counts[git.Failed])
+	fmt.Printf("\nDone.  %d cloned  %d updated  %d up-to-date  %d skipped  %d failed\n",
+		counts[git.Cloned], counts[git.Pulled], counts[git.UpToDate], counts[git.Skipped], counts[git.Failed])
 
 	return nil
 }

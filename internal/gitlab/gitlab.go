@@ -7,7 +7,12 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
+
+var httpClient = &http.Client{
+	Timeout: 30 * time.Second,
+}
 
 type Repo struct {
 	Name        string `json:"path"`
@@ -47,12 +52,15 @@ func resolveGroupID(group, token, baseURL string) (int, error) {
 		req.Header.Set("PRIVATE-TOKEN", token)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return 0, err
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == 401 {
+		return 0, fmt.Errorf("authentication failed — check your token")
+	}
 	if resp.StatusCode != 200 {
 		return 0, fmt.Errorf("GitLab API: HTTP %d for group %q", resp.StatusCode, group)
 	}
@@ -60,7 +68,10 @@ func resolveGroupID(group, token, baseURL string) (int, error) {
 	var result struct {
 		ID int `json:"id"`
 	}
-	return result.ID, json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return 0, fmt.Errorf("parsing group response: %w", err)
+	}
+	return result.ID, nil
 }
 
 func fetchPage(groupID int, token, baseURL string, page int) ([]Repo, error) {
@@ -74,11 +85,18 @@ func fetchPage(groupID int, token, baseURL string, page int) ([]Repo, error) {
 		req.Header.Set("PRIVATE-TOKEN", token)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return nil, fmt.Errorf("authentication failed — check your token")
+	}
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("GitLab API: HTTP %d", resp.StatusCode)
+	}
 
 	var repos []Repo
 	return repos, json.NewDecoder(resp.Body).Decode(&repos)

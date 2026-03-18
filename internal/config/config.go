@@ -32,7 +32,11 @@ type orgConfig struct {
 
 func load() Config {
 	var cfg Config
-	data, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".orgclone.yml"))
+	home := homeDir()
+	if home == "" {
+		return cfg
+	}
+	data, err := os.ReadFile(filepath.Join(home, ".orgclone.yml"))
 	if err != nil {
 		return cfg
 	}
@@ -89,6 +93,9 @@ func homeDir() string {
 }
 
 func expandHome(path string) string { //nolint
+	if path == "~" {
+		return homeDir()
+	}
 	if len(path) >= 2 && path[:2] == "~/" {
 		return filepath.Join(homeDir(), path[2:])
 	}
